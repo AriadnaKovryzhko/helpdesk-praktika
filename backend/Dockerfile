@@ -13,6 +13,7 @@ ENV NODE_ENV=production
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/dist ./dist
 COPY --from=build --chown=node:node /app/prisma ./prisma
+RUN mkdir -p /app/uploads && chown node:node /app/uploads
 COPY --from=build --chown=node:node /app/package.json /app/docker-entrypoint.sh ./
 USER node
 EXPOSE 3000
