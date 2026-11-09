@@ -120,15 +120,23 @@ async function seedDemoData(roleIds: Map<RoleCode, number>): Promise<void> {
     const priority = priorities[i % priorities.length];
     const policy = policies.get(priority)!;
     const author = requesters[i % requesters.length];
-    const createdAt = new Date(now - (i % 14) * DAY - (i + 1) * 37 * MINUTE);
+    const isFinished = status === TicketStatus.RESOLVED || status === TicketStatus.CLOSED;
+    const isLate = isFinished && i % 10 === 4;
+    const openDeadline =
+      status === TicketStatus.NEW ? policy.reactionMinutes : policy.resolutionMinutes;
+    const openAge = (i % 8 === 0 ? openDeadline + 30 : openDeadline * 0.4) * MINUTE;
+    const createdAt = new Date(
+      now - (isFinished ? ((i % 13) + 1) * DAY + (i + 1) * 37 * MINUTE : openAge),
+    );
     const assignee = status === TicketStatus.NEW ? null : agents[i % agents.length];
     const reactionDueAt = new Date(createdAt.getTime() + policy.reactionMinutes * MINUTE);
     const resolutionDueAt = new Date(createdAt.getTime() + policy.resolutionMinutes * MINUTE);
-    const step = (index: number) => new Date(createdAt.getTime() + (index + 1) * 11 * MINUTE);
     const resolvedIndex = path.indexOf(TicketStatus.RESOLVED);
+    const stepMinutes = isLate ? (policy.resolutionMinutes + 20) / (resolvedIndex + 1) : 3;
+    const step = (index: number) =>
+      new Date(createdAt.getTime() + (index + 1) * stepMinutes * MINUTE);
     const closedIndex = path.indexOf(TicketStatus.CLOSED);
     const resolvedAt = resolvedIndex >= 0 ? step(resolvedIndex) : null;
-    const isOpen = status !== TicketStatus.RESOLVED && status !== TicketStatus.CLOSED;
     const isReacted = assignee !== null;
 
     await prisma.ticket.create({
@@ -147,7 +155,8 @@ async function seedDemoData(roleIds: Map<RoleCode, number>): Promise<void> {
         resolvedAt,
         closedAt: closedIndex >= 0 ? step(closedIndex) : null,
         reactionBreachedAt: !isReacted && reactionDueAt.getTime() < now ? reactionDueAt : null,
-        resolutionBreachedAt: isOpen && resolutionDueAt.getTime() < now ? resolutionDueAt : null,
+        resolutionBreachedAt:
+          isLate || (!isFinished && resolutionDueAt.getTime() < now) ? resolutionDueAt : null,
         statusHistory: {
           create: path.map((toStatus, index) => ({
             fromStatus: index === 0 ? null : path[index - 1],
