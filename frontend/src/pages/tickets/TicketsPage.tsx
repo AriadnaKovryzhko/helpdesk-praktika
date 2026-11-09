@@ -4,6 +4,7 @@ import { useAgents, useCategories, useTickets } from '@/api/tickets';
 import type { Priority, Ticket, TicketStatus } from '@/api/types';
 import { useAuth } from '@/auth/AuthContext';
 import { PageHeader } from '@/layout/AppShell';
+import { cn } from '@/lib/cn';
 import { formatDateTime } from '@/lib/format';
 import { PRIORITIES, PRIORITY_LABELS, STATUSES, STATUS_LABELS } from '@/lib/labels';
 import { useDebouncedValue } from '@/lib/useDebouncedValue';
@@ -67,6 +68,7 @@ export function TicketsPage() {
   const isAgent = hasRole('AGENT');
   const [params, setParams] = useSearchParams();
   const [searchInput, setSearchInput] = useState(params.get('search') ?? '');
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const search = useDebouncedValue(searchInput);
   const categories = useCategories();
   const agents = useAgents(isManager);
@@ -147,87 +149,97 @@ export function TicketsPage() {
           value={searchInput}
           onChange={(event) => setSearchInput(event.target.value)}
         />
-        <SelectField
-          label="Статус"
-          value={params.get('status') ?? ''}
-          onChange={(event) => update({ status: event.target.value })}
+        <Button
+          variant="secondary"
+          className="sm:hidden"
+          aria-expanded={filtersOpen}
+          onClick={() => setFiltersOpen((open) => !open)}
         >
-          <option value="">Все статусы</option>
-          {STATUSES.map((status) => (
-            <option key={status} value={status}>
-              {STATUS_LABELS[status]}
-            </option>
-          ))}
-        </SelectField>
-        <SelectField
-          label="Приоритет"
-          value={params.get('priority') ?? ''}
-          onChange={(event) => update({ priority: event.target.value })}
-        >
-          <option value="">Все приоритеты</option>
-          {PRIORITIES.map((priority) => (
-            <option key={priority} value={priority}>
-              {PRIORITY_LABELS[priority]}
-            </option>
-          ))}
-        </SelectField>
-        <SelectField
-          label="Категория"
-          value={params.get('categoryId') ?? ''}
-          onChange={(event) => update({ categoryId: event.target.value })}
-        >
-          <option value="">Все категории</option>
-          {categories.data?.map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.name}
-            </option>
-          ))}
-        </SelectField>
-        {(isAgent || isManager) && (
+          {filtersOpen ? 'Скрыть фильтры' : 'Фильтры и сортировка'}
+        </Button>
+        <div className={cn('contents', !filtersOpen && 'max-sm:hidden')}>
           <SelectField
-            label="Показать"
-            value={scope}
-            onChange={(event) => update({ scope: event.target.value })}
+            label="Статус"
+            value={params.get('status') ?? ''}
+            onChange={(event) => update({ status: event.target.value })}
           >
-            <option value="">Все доступные</option>
-            <option value="assigned">Назначенные на меня</option>
-            <option value="created">Созданные мной</option>
-          </SelectField>
-        )}
-        {isManager && (
-          <SelectField
-            label="Исполнитель"
-            value={params.get('assigneeId') ?? ''}
-            onChange={(event) => update({ assigneeId: event.target.value })}
-          >
-            <option value="">Все исполнители</option>
-            {agents.data?.map((agent) => (
-              <option key={agent.id} value={agent.id}>
-                {agent.fullName}
+            <option value="">Все статусы</option>
+            {STATUSES.map((status) => (
+              <option key={status} value={status}>
+                {STATUS_LABELS[status]}
               </option>
             ))}
           </SelectField>
-        )}
-        <SelectField
-          label="Сортировка"
-          value={sort}
-          onChange={(event) => update({ sort: event.target.value })}
-        >
-          {SORT_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </SelectField>
-        <label className="flex items-center gap-2 self-end pb-2.5 text-sm text-ink-700">
-          <input
-            type="checkbox"
-            className="h-4 w-4 rounded border-ink-300"
-            checked={params.get('overdue') === 'true'}
-            onChange={(event) => update({ overdue: event.target.checked ? 'true' : '' })}
-          />
-          Только просроченные
-        </label>
+          <SelectField
+            label="Приоритет"
+            value={params.get('priority') ?? ''}
+            onChange={(event) => update({ priority: event.target.value })}
+          >
+            <option value="">Все приоритеты</option>
+            {PRIORITIES.map((priority) => (
+              <option key={priority} value={priority}>
+                {PRIORITY_LABELS[priority]}
+              </option>
+            ))}
+          </SelectField>
+          <SelectField
+            label="Категория"
+            value={params.get('categoryId') ?? ''}
+            onChange={(event) => update({ categoryId: event.target.value })}
+          >
+            <option value="">Все категории</option>
+            {categories.data?.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </SelectField>
+          {(isAgent || isManager) && (
+            <SelectField
+              label="Показать"
+              value={scope}
+              onChange={(event) => update({ scope: event.target.value })}
+            >
+              <option value="">Все доступные</option>
+              <option value="assigned">Назначенные на меня</option>
+              <option value="created">Созданные мной</option>
+            </SelectField>
+          )}
+          {isManager && (
+            <SelectField
+              label="Исполнитель"
+              value={params.get('assigneeId') ?? ''}
+              onChange={(event) => update({ assigneeId: event.target.value })}
+            >
+              <option value="">Все исполнители</option>
+              {agents.data?.map((agent) => (
+                <option key={agent.id} value={agent.id}>
+                  {agent.fullName}
+                </option>
+              ))}
+            </SelectField>
+          )}
+          <SelectField
+            label="Сортировка"
+            value={sort}
+            onChange={(event) => update({ sort: event.target.value })}
+          >
+            {SORT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </SelectField>
+          <label className="flex items-center gap-2 self-end pb-2.5 text-sm text-ink-700">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-ink-300"
+              checked={params.get('overdue') === 'true'}
+              onChange={(event) => update({ overdue: event.target.checked ? 'true' : '' })}
+            />
+            Только просроченные
+          </label>
+        </div>
       </Card>
 
       <Card>
