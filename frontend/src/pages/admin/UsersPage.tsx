@@ -35,9 +35,10 @@ function RolesDialog({
 }) {
   const [roles, setRoles] = useState<Role[]>(user.roles);
   const toggle = (role: Role) =>
-    setRoles((current) =>
-      current.includes(role) ? current.filter((item) => item !== role) : [...current, role],
-    );
+    setRoles((current) => {
+      if (current.includes(role)) return current.filter((item) => item !== role);
+      return role === 'USER' ? ['USER'] : [...current.filter((item) => item !== 'USER'), role];
+    });
 
   return (
     <Modal
@@ -68,6 +69,9 @@ function RolesDialog({
           </label>
         ))}
       </fieldset>
+      <p className="mt-3 text-xs text-ink-500">
+        Роль «Пользователь» не совмещается с ролями сотрудников.
+      </p>
       {roles.length === 0 && (
         <p role="alert" className="mt-2 text-xs text-red-600">
           Выберите хотя бы одну роль

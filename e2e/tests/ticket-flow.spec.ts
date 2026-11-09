@@ -38,6 +38,15 @@ test('заявка проходит путь от создания до закр
   await expect(manager.getByRole('listitem').getByText('Смена статуса').first()).toBeVisible();
 });
 
+test('сотрудники не создают заявки', async ({ browser }) => {
+  for (const email of [AGENT, MANAGER]) {
+    const staff = await openSession(browser, email);
+    await expect(staff.getByRole('link', { name: 'Создать заявку' })).toHaveCount(0);
+    await staff.goto('/tickets/new');
+    await expect(staff.getByText('Недостаточно прав')).toBeVisible();
+  }
+});
+
 test('пользователю закрыты чужие заявки и панель руководителя', async ({ browser }) => {
   const owner = await openSession(browser, USER);
   await createTicket(owner, `Личная заявка ${Date.now()}`);

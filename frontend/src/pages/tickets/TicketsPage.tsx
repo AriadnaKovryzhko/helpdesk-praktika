@@ -66,6 +66,7 @@ export function TicketsPage() {
   const { hasRole } = useAuth();
   const isManager = hasRole('MANAGER');
   const isAgent = hasRole('AGENT');
+  const canCreate = hasRole('USER');
   const [params, setParams] = useSearchParams();
   const [searchInput, setSearchInput] = useState(params.get('search') ?? '');
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -116,7 +117,6 @@ export function TicketsPage() {
     assigneeId: params.get('assigneeId'),
     overdue: params.get('overdue') === 'true' ? true : undefined,
     assignedToMe: scope === 'assigned' ? true : undefined,
-    createdByMe: scope === 'created' ? true : undefined,
     sortBy,
     sortOrder,
   });
@@ -136,9 +136,11 @@ export function TicketsPage() {
       <PageHeader
         title="Заявки"
         actions={
-          <Link to="/tickets/new">
-            <Button>Создать заявку</Button>
-          </Link>
+          canCreate ? (
+            <Link to="/tickets/new">
+              <Button>Создать заявку</Button>
+            </Link>
+          ) : undefined
         }
       />
       <Card className="mb-4 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -202,7 +204,6 @@ export function TicketsPage() {
             >
               <option value="">Все доступные</option>
               <option value="assigned">Назначенные на меня</option>
-              <option value="created">Созданные мной</option>
             </SelectField>
           )}
           {isManager && (
@@ -251,7 +252,11 @@ export function TicketsPage() {
           <EmptyState
             title={hasFilters ? 'Ничего не найдено' : 'Заявок пока нет'}
             description={
-              hasFilters ? 'Измените условия поиска.' : 'Создайте первую заявку в поддержку.'
+              hasFilters
+                ? 'Измените условия поиска.'
+                : canCreate
+                  ? 'Создайте первую заявку в поддержку.'
+                  : 'Новые заявки появятся здесь.'
             }
           />
         ) : (

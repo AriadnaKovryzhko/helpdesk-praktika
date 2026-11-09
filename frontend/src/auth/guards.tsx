@@ -17,7 +17,7 @@ export function RequireRole({ roles }: { roles: Role[] }) {
     return (
       <EmptyState
         title="Недостаточно прав"
-        description="Этот раздел доступен только руководителю."
+        description="У вашей роли нет доступа к этому разделу."
       />
     );
   }
