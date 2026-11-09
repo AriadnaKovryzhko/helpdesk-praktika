@@ -87,6 +87,26 @@ jobs:
         run: curl --fail --silent --show-error http://localhost:8080/api/health
       - name: Check main page through Nginx
         run: curl --fail --silent --show-error http://localhost:8080/ | grep -q '<div id="root">'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+      - name: Install Playwright
+        working-directory: e2e
+        run: npm ci && npx playwright install --with-deps chromium
+      - name: Run end-to-end tests through docker compose
+        working-directory: e2e
+        env:
+          BASE_URL: http://localhost:8080
+        run: npx playwright test
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e/playwright-report
+          retention-days: 7
       - name: Show container logs on failure
         if: failure()
         run: docker compose logs --no-color --tail 200
