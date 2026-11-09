@@ -15,7 +15,7 @@ import { UsersPage } from '@/pages/admin/UsersPage';
 import { CategoriesPage } from '@/pages/admin/CategoriesPage';
 import { SlaPoliciesPage } from '@/pages/admin/SlaPoliciesPage';
 import { AuditPage } from '@/pages/admin/AuditPage';
-import { Placeholder } from '@/pages/Placeholder';
+import { NotificationsPage } from '@/pages/NotificationsPage';
 import { LoadingState } from '@/ui';
 
 const DashboardPage = lazy(() =>
@@ -38,7 +38,7 @@ export function AppRoutes() {
           <Route path="/tickets/new" element={<NewTicketPage />} />
           <Route path="/tickets/:id" element={<TicketDetailsPage />} />
           <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/notifications" element={<Placeholder title="Уведомления" />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
           <Route element={<RequireRole roles={['MANAGER']} />}>
             <Route
               path="/dashboard"
