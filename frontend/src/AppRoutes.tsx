@@ -6,6 +6,8 @@ import { LoginPage } from '@/pages/auth/LoginPage';
 import { RegisterPage } from '@/pages/auth/RegisterPage';
 import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage';
 import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage';
+import { TicketsPage } from '@/pages/tickets/TicketsPage';
+import { NewTicketPage } from '@/pages/tickets/NewTicketPage';
 import { Placeholder } from '@/pages/Placeholder';
 
 export function AppRoutes() {
@@ -20,8 +22,8 @@ export function AppRoutes() {
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
           <Route index element={<Navigate to="/tickets" replace />} />
-          <Route path="/tickets" element={<Placeholder title="Заявки" />} />
-          <Route path="/tickets/new" element={<Placeholder title="Новая заявка" />} />
+          <Route path="/tickets" element={<TicketsPage />} />
+          <Route path="/tickets/new" element={<NewTicketPage />} />
           <Route path="/tickets/:id" element={<Placeholder title="Карточка заявки" />} />
           <Route path="/profile" element={<Placeholder title="Личный кабинет" />} />
           <Route path="/notifications" element={<Placeholder title="Уведомления" />} />
