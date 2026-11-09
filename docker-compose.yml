@@ -19,6 +19,7 @@ services:
     restart: unless-stopped
     environment:
       PORT: 3000
+      SEED_ON_START: ${SEED_ON_START:-true}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
       DATABASE_URL: postgresql://${POSTGRES_USER:-helpdesk}:${POSTGRES_PASSWORD:-helpdesk_local}@db:5432/${POSTGRES_DB:-helpdesk}
     depends_on:

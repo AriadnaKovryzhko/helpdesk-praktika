@@ -1,0 +1,254 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RoleCode {
+  USER
+  AGENT
+  MANAGER
+}
+
+enum TicketStatus {
+  NEW
+  ASSIGNED
+  IN_PROGRESS
+  WAITING_USER
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum NotificationType {
+  TICKET_CREATED
+  TICKET_ASSIGNED
+  STATUS_CHANGED
+  COMMENT_ADDED
+  SLA_BREACHED
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique @db.VarChar(254)
+  passwordHash String   @map("password_hash")
+  fullName     String   @map("full_name") @db.VarChar(120)
+  phone        String?  @db.VarChar(32)
+  isBlocked    Boolean  @default(false) @map("is_blocked")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  roles           UserRole[]
+  refreshTokens   RefreshToken[]
+  resetTokens     PasswordResetToken[]
+  authoredTickets Ticket[]              @relation("TicketAuthor")
+  assignedTickets Ticket[]              @relation("TicketAssignee")
+  comments        TicketComment[]
+  attachments     TicketAttachment[]
+  statusChanges   TicketStatusHistory[]
+  notifications   Notification[]
+  auditLogs       AuditLog[]
+
+  @@index([fullName])
+  @@index([createdAt])
+  @@index([isBlocked])
+  @@map("users")
+}
+
+model Role {
+  id    Int        @id @default(autoincrement())
+  code  RoleCode   @unique
+  name  String     @db.VarChar(50)
+  users UserRole[]
+
+  @@map("roles")
+}
+
+model UserRole {
+  userId String @map("user_id") @db.Uuid
+  roleId Int    @map("role_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  familyId  String    @map("family_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash") @db.Char(64)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash") @db.Char(64)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model Category {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique @db.VarChar(80)
+  description String?  @db.VarChar(300)
+  isActive    Boolean  @default(true) @map("is_active")
+  tickets     Ticket[]
+
+  @@map("categories")
+}
+
+model SlaPolicy {
+  id                Int            @id @default(autoincrement())
+  priority          TicketPriority @unique
+  reactionMinutes   Int            @map("reaction_minutes")
+  resolutionMinutes Int            @map("resolution_minutes")
+  tickets           Ticket[]
+
+  @@map("sla_policies")
+}
+
+model Ticket {
+  id                   String         @id @default(uuid()) @db.Uuid
+  number               Int            @unique @default(autoincrement())
+  title                String         @db.VarChar(200)
+  description          String
+  status               TicketStatus   @default(NEW)
+  priority             TicketPriority
+  categoryId           Int            @map("category_id")
+  authorId             String         @map("author_id") @db.Uuid
+  assigneeId           String?        @map("assignee_id") @db.Uuid
+  reactionDueAt        DateTime       @map("reaction_due_at") @db.Timestamptz(3)
+  resolutionDueAt      DateTime       @map("resolution_due_at") @db.Timestamptz(3)
+  reactedAt            DateTime?      @map("reacted_at") @db.Timestamptz(3)
+  resolvedAt           DateTime?      @map("resolved_at") @db.Timestamptz(3)
+  closedAt             DateTime?      @map("closed_at") @db.Timestamptz(3)
+  reactionBreachedAt   DateTime?      @map("reaction_breached_at") @db.Timestamptz(3)
+  resolutionBreachedAt DateTime?      @map("resolution_breached_at") @db.Timestamptz(3)
+  createdAt            DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  slaPolicy     SlaPolicy             @relation(fields: [priority], references: [priority], onDelete: Restrict)
+  category      Category              @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  author        User                  @relation("TicketAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  assignee      User?                 @relation("TicketAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  comments      TicketComment[]
+  attachments   TicketAttachment[]
+  statusHistory TicketStatusHistory[]
+  notifications Notification[]
+
+  @@index([status])
+  @@index([priority])
+  @@index([categoryId])
+  @@index([authorId])
+  @@index([assigneeId])
+  @@index([createdAt])
+  @@index([resolutionDueAt])
+  @@index([title])
+  @@map("tickets")
+}
+
+model TicketComment {
+  id        String   @id @default(uuid()) @db.Uuid
+  ticketId  String   @map("ticket_id") @db.Uuid
+  authorId  String   @map("author_id") @db.Uuid
+  body      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([ticketId, createdAt])
+  @@map("ticket_comments")
+}
+
+model TicketAttachment {
+  id           String   @id @default(uuid()) @db.Uuid
+  ticketId     String   @map("ticket_id") @db.Uuid
+  uploaderId   String   @map("uploader_id") @db.Uuid
+  originalName String   @map("original_name") @db.VarChar(255)
+  storedName   String   @unique @map("stored_name") @db.VarChar(64)
+  mimeType     String   @map("mime_type") @db.VarChar(100)
+  sizeBytes    Int      @map("size_bytes")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  ticket       Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  uploader     User     @relation(fields: [uploaderId], references: [id], onDelete: Restrict)
+
+  @@index([ticketId])
+  @@map("ticket_attachments")
+}
+
+model TicketStatusHistory {
+  id          String        @id @default(uuid()) @db.Uuid
+  ticketId    String        @map("ticket_id") @db.Uuid
+  changedById String        @map("changed_by_id") @db.Uuid
+  fromStatus  TicketStatus? @map("from_status")
+  toStatus    TicketStatus  @map("to_status")
+  comment     String?       @db.VarChar(500)
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  ticket      Ticket        @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  changedBy   User          @relation(fields: [changedById], references: [id], onDelete: Restrict)
+
+  @@index([ticketId, createdAt])
+  @@map("ticket_status_history")
+}
+
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  ticketId  String?          @map("ticket_id") @db.Uuid
+  type      NotificationType
+  title     String           @db.VarChar(200)
+  body      String           @db.VarChar(500)
+  readAt    DateTime?        @map("read_at") @db.Timestamptz(3)
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ticket    Ticket?          @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  actorId    String?  @map("actor_id") @db.Uuid
+  action     String   @db.VarChar(64)
+  entityType String   @map("entity_type") @db.VarChar(32)
+  entityId   String?  @map("entity_id") @db.VarChar(64)
+  details    Json?
+  ip         String?  @db.VarChar(64)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([action])
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
