@@ -35,7 +35,9 @@ export function AppRoutes() {
         <Route element={<AppShell />}>
           <Route index element={<Navigate to="/tickets" replace />} />
           <Route path="/tickets" element={<TicketsPage />} />
-          <Route path="/tickets/new" element={<NewTicketPage />} />
+          <Route element={<RequireRole roles={['USER']} />}>
+            <Route path="/tickets/new" element={<NewTicketPage />} />
+          </Route>
           <Route path="/tickets/:id" element={<TicketDetailsPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/notifications" element={<NotificationsPage />} />

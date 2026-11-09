@@ -145,16 +145,24 @@ function PasswordForm() {
 
 function TicketHistory() {
   const [page, setPage] = useState(1);
-  const tickets = useTickets({ createdByMe: true, page, pageSize: 10 });
+  const { hasRole } = useAuth();
+  const isRequester = hasRole('USER');
+  const tickets = useTickets({
+    ...(isRequester ? { createdByMe: true } : { assignedToMe: true }),
+    page,
+    pageSize: 10,
+  });
   return (
     <Card className="p-5">
-      <h2 className="mb-2 font-semibold text-ink-900">История заявок</h2>
+      <h2 className="mb-2 font-semibold text-ink-900">
+        {isRequester ? 'История заявок' : 'Назначенные заявки'}
+      </h2>
       {tickets.isPending ? (
         <LoadingState />
       ) : tickets.isError ? (
         <ErrorState error={tickets.error} onRetry={() => void tickets.refetch()} />
       ) : tickets.data.data.length === 0 ? (
-        <EmptyState title="Вы ещё не создавали заявок" />
+        <EmptyState title={isRequester ? 'Вы ещё не создавали заявок' : 'Назначенных заявок нет'} />
       ) : (
         <ul>
           {tickets.data.data.map((ticket) => (
