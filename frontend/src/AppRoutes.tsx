@@ -2,16 +2,20 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { GuestOnly, RequireAuth, RequireRole } from '@/auth/guards';
 import { AppShell } from '@/layout/AppShell';
 import { NotFoundPage } from '@/pages/NotFoundPage';
+import { LoginPage } from '@/pages/auth/LoginPage';
+import { RegisterPage } from '@/pages/auth/RegisterPage';
+import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage';
+import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage';
 import { Placeholder } from '@/pages/Placeholder';
 
 export function AppRoutes() {
   return (
     <Routes>
       <Route element={<GuestOnly />}>
-        <Route path="/login" element={<Placeholder title="Вход" />} />
-        <Route path="/register" element={<Placeholder title="Регистрация" />} />
-        <Route path="/forgot-password" element={<Placeholder title="Восстановление пароля" />} />
-        <Route path="/reset-password" element={<Placeholder title="Новый пароль" />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
       </Route>
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
