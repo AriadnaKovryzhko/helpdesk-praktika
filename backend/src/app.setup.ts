@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
+import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
@@ -22,6 +23,7 @@ export function configureApp(app: NestExpressApplication): void {
   app.set('trust proxy', 1);
   // CSP для SPA задаёт Nginx; здесь она сломала бы встроенные скрипты Swagger UI.
   app.use(helmet({ contentSecurityPolicy: false }));
+  app.use(cookieParser());
   app.enableCors({
     origin: (config.get<string>('CORS_ORIGIN') ?? '').split(',').filter(Boolean),
     credentials: true,

@@ -1,6 +1,7 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, Logger } from '@nestjs/common';
 import { Response } from 'express';
 import { AppException } from '../errors/app.exception';
+import { mapPrismaError } from './prisma-errors';
 
 export interface ApiError {
   status: number;
@@ -16,7 +17,7 @@ const DEFAULT_ERRORS: Record<number, { code: string; message: string }> = {
   404: { code: 'NOT_FOUND', message: 'Ресурс не найден' },
   405: { code: 'METHOD_NOT_ALLOWED', message: 'Метод не поддерживается' },
   409: { code: 'CONFLICT', message: 'Конфликт данных' },
-  413: { code: 'PAYLOAD_TOO_LARGE', message: 'Размер данных превышает допустимый' },
+  413: { code: 'PAYLOAD_TOO_LARGE', message: 'Размер файла превышает допустимые 5 МБ' },
   415: { code: 'UNSUPPORTED_MEDIA_TYPE', message: 'Неподдерживаемый формат данных' },
   429: { code: 'TOO_MANY_REQUESTS', message: 'Слишком много запросов, повторите позже' },
 };
@@ -44,7 +45,8 @@ export function toApiError(exception: unknown): ApiError {
       ? { status, ...known, details: null }
       : { status, code: 'HTTP_ERROR', message: exception.message, details: null };
   }
-  return INTERNAL_ERROR;
+  const prismaError = mapPrismaError(exception);
+  return prismaError ? { ...prismaError, details: null } : INTERNAL_ERROR;
 }
 
 @Catch()
