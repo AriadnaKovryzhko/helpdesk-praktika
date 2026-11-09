@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - run: npm ci
+        working-directory: backend
+      - run: npm run lint
+        working-directory: backend
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run lint
+        working-directory: frontend
+
+  test:
+    name: Test
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - run: npm ci
+        working-directory: backend
+      - run: npm run test:cov
+        working-directory: backend
+      - run: npm run test:int
+        working-directory: backend
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run test
+        working-directory: frontend
+
+  docker:
+    name: Docker
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build images
+        run: docker compose build
+      - name: Start containers and wait until healthy
+        run: docker compose up -d --wait --wait-timeout 180
+      - name: Check API health through Nginx
+        run: curl --fail --silent --show-error http://localhost:8080/api/health
+      - name: Check main page through Nginx
+        run: curl --fail --silent --show-error http://localhost:8080/ | grep -q '<div id="root">'
+      - name: Show container logs on failure
+        if: failure()
+        run: docker compose logs --no-color --tail 200
+      - name: Stop containers
+        if: always()
+        run: docker compose down -v
