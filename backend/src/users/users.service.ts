@@ -65,6 +65,13 @@ export class UsersService {
 
   async updateRoles(id: string, dto: UpdateRolesDto, actor: AuthUser): Promise<UserDto> {
     const before = await this.require(id);
+    if (dto.roles.includes(RoleCode.USER) && dto.roles.length > 1) {
+      throw new AppException(
+        HttpStatus.BAD_REQUEST,
+        'INCOMPATIBLE_ROLES',
+        'Роль пользователя нельзя совмещать с ролями сотрудников',
+      );
+    }
     if (id === actor.id && !dto.roles.includes(RoleCode.MANAGER)) {
       throw new AppException(
         HttpStatus.CONFLICT,

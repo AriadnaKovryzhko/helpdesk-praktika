@@ -84,6 +84,24 @@ describe('TicketPolicyService', () => {
     });
   });
 
+  describe('разделение автора и обработки', () => {
+    const own = { status: TicketStatus.NEW, authorId: 'agent', assigneeId: null };
+
+    it('не даёт исполнителю взять свою заявку', () => {
+      expect(policy.canTake(own, agent)).toBe(false);
+    });
+
+    it('не даёт руководителю назначать исполнителя на свою заявку', () => {
+      expect(policy.canAssign({ ...own, authorId: 'manager' }, manager)).toBe(false);
+    });
+
+    it('не считает автора ответственным даже с ролью руководителя', () => {
+      const target = { status: TicketStatus.IN_PROGRESS, authorId: 'manager', assigneeId: 'agent' };
+      expect(policy.isResponsible(target, manager)).toBe(false);
+      expect(policy.allowedTransitions(target, manager)).toEqual([]);
+    });
+  });
+
   describe('разрешённые переходы', () => {
     it('не предлагает назначение как обычный переход', () => {
       expect(policy.allowedTransitions(ticket(TicketStatus.NEW, null), manager)).toEqual([]);

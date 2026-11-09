@@ -25,6 +25,7 @@ export class TicketPolicyService {
   }
 
   isResponsible(ticket: TicketAccessFields, user: AuthUser): boolean {
+    if (ticket.authorId === user.id) return false;
     return hasRole(user, RoleCode.MANAGER) || ticket.assigneeId === user.id;
   }
 
@@ -46,13 +47,18 @@ export class TicketPolicyService {
   canTake(ticket: TicketAccessFields, user: AuthUser): boolean {
     return (
       hasRole(user, RoleCode.AGENT) &&
+      ticket.authorId !== user.id &&
       ticket.status === TicketStatus.NEW &&
       ticket.assigneeId === null
     );
   }
 
   canAssign(ticket: TicketAccessFields, user: AuthUser): boolean {
-    return hasRole(user, RoleCode.MANAGER) && OPEN_STATUSES.includes(ticket.status);
+    return (
+      hasRole(user, RoleCode.MANAGER) &&
+      ticket.authorId !== user.id &&
+      OPEN_STATUSES.includes(ticket.status)
+    );
   }
 
   canTransition(ticket: TicketAccessFields, target: TicketStatus, user: AuthUser): boolean {

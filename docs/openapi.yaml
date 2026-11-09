@@ -287,7 +287,7 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
     post:
       tags: [tickets]
-      summary: Создание заявки
+      summary: Создание заявки (USER)
       requestBody:
         required: true
         content:
@@ -295,6 +295,7 @@ paths:
             schema: { $ref: '#/components/schemas/TicketInput' }
       responses:
         '201': { $ref: '#/components/responses/TicketResponse' }
+        '403': { $ref: '#/components/responses/Error' }
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
   /tickets/{id}:
@@ -352,7 +353,7 @@ paths:
   /tickets/{id}/assign:
     post:
       tags: [tickets]
-      summary: Назначение исполнителя (без assigneeId назначается текущий исполнитель)
+      summary: Назначение исполнителя (без assigneeId назначается текущий исполнитель, автор заявки назначен быть не может)
       parameters: [{ $ref: '#/components/parameters/Id' }]
       requestBody:
         content:

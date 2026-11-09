@@ -12,8 +12,9 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { RoleCode } from '@prisma/client';
 import { AuthUser } from '../common/auth/auth-user';
-import { CurrentUser } from '../common/auth/decorators';
+import { CurrentUser, Roles } from '../common/auth/decorators';
 import {
   AssignTicketDto,
   ChangeStatusDto,
@@ -34,6 +35,7 @@ export class TicketsController {
     return this.tickets.list(query, user);
   }
 
+  @Roles(RoleCode.USER)
   @Post()
   create(@Body() dto: CreateTicketDto, @CurrentUser() user: AuthUser) {
     return this.tickets

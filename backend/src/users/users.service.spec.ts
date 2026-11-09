@@ -99,6 +99,18 @@ describe('UsersService', () => {
     expect(users.replaceRoles).toHaveBeenCalledWith('u', [RoleCode.AGENT]);
   });
 
+  it('не совмещает роль пользователя с ролями сотрудников', async () => {
+    expect(
+      await code(service.updateRoles('u', { roles: [RoleCode.USER, RoleCode.AGENT] }, manager)),
+    ).toBe('INCOMPATIBLE_ROLES');
+    expect(users.replaceRoles).not.toHaveBeenCalled();
+  });
+
+  it('разрешает совмещать роли сотрудников', async () => {
+    await service.updateRoles('u', { roles: [RoleCode.AGENT, RoleCode.MANAGER] }, manager);
+    expect(users.replaceRoles).toHaveBeenCalledWith('u', [RoleCode.AGENT, RoleCode.MANAGER]);
+  });
+
   it('не даёт руководителю снять с себя роль', async () => {
     expect(await code(service.updateRoles('m', { roles: [RoleCode.USER] }, manager))).toBe(
       'CANNOT_DEMOTE_SELF',
