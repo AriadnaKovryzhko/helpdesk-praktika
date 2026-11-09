@@ -1,7 +1,10 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { RoleCode, TicketStatus } from '@prisma/client';
+import { NotificationType, RoleCode, TicketStatus } from '@prisma/client';
+import { AuditAction } from '../audit/audit.actions';
+import { AuditService } from '../audit/audit.service';
 import { AuthUser, hasRole } from '../common/auth/auth-user';
 import { AppException } from '../common/errors/app.exception';
+import { NotificationsService } from '../notifications/notifications.service';
 import { TicketsService } from '../tickets/tickets.service';
 import { CommentsRepository, CommentWithAuthor } from './comments.repository';
 
@@ -10,6 +13,8 @@ export class CommentsService {
   constructor(
     private readonly comments: CommentsRepository,
     private readonly tickets: TicketsService,
+    private readonly notifications: NotificationsService,
+    private readonly audit: AuditService,
   ) {}
 
   async list(ticketId: string, user: AuthUser) {
@@ -27,7 +32,16 @@ export class CommentsService {
         'Заявка закрыта, добавить комментарий нельзя',
       );
     }
-    return this.present(await this.comments.create(ticketId, user.id, body), user);
+    const comment = await this.comments.create(ticketId, user.id, body);
+    await this.notifications.notify({
+      userIds: [ticket.authorId, ...(ticket.assigneeId ? [ticket.assigneeId] : [])],
+      ticketId,
+      type: NotificationType.COMMENT_ADDED,
+      title: `Новый комментарий к заявке №${ticket.number}`,
+      body: body.slice(0, 200),
+      excludeUserId: user.id,
+    });
+    return this.present(comment, user);
   }
 
   async update(ticketId: string, commentId: string, body: string, user: AuthUser) {
@@ -52,6 +66,13 @@ export class CommentsService {
       );
     }
     await this.comments.delete(commentId);
+    await this.audit.record({
+      actorId: user.id,
+      action: AuditAction.COMMENT_DELETED,
+      entityType: 'TicketComment',
+      entityId: commentId,
+      details: { ticketId },
+    });
   }
 
   private async getInTicket(

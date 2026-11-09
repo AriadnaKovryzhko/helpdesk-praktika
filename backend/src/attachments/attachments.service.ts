@@ -2,6 +2,8 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { RoleCode, TicketStatus } from '@prisma/client';
 import { ReadStream } from 'fs';
 import { basename } from 'path';
+import { AuditAction } from '../audit/audit.actions';
+import { AuditService } from '../audit/audit.service';
 import { AuthUser, hasRole } from '../common/auth/auth-user';
 import { AppException } from '../common/errors/app.exception';
 import { TicketsService } from '../tickets/tickets.service';
@@ -44,6 +46,7 @@ export class AttachmentsService {
     private readonly attachments: AttachmentsRepository,
     private readonly storage: AttachmentStorageService,
     private readonly tickets: TicketsService,
+    private readonly audit: AuditService,
   ) {}
 
   async list(ticketId: string, user: AuthUser) {
@@ -96,6 +99,13 @@ export class AttachmentsService {
         mimeType: detected.mimeType,
         sizeBytes: file.size,
       });
+      await this.audit.record({
+        actorId: user.id,
+        action: AuditAction.ATTACHMENT_ADDED,
+        entityType: 'TicketAttachment',
+        entityId: attachment.id,
+        details: { ticketId, name: attachment.originalName },
+      });
       return this.present(attachment, user);
     } catch (error) {
       await this.storage.remove(storedName);
@@ -128,6 +138,13 @@ export class AttachmentsService {
     }
     await this.attachments.delete(attachmentId);
     await this.storage.remove(attachment.storedName);
+    await this.audit.record({
+      actorId: user.id,
+      action: AuditAction.ATTACHMENT_DELETED,
+      entityType: 'TicketAttachment',
+      entityId: attachmentId,
+      details: { ticketId, name: attachment.originalName },
+    });
   }
 
   private async getInTicket(ticketId: string, attachmentId: string, user: AuthUser) {

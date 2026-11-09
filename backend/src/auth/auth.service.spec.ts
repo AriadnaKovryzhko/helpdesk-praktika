@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { RoleCode } from '@prisma/client';
 import * as argon2 from 'argon2';
+import { AuditService } from '../audit/audit.service';
 import { AppException } from '../common/errors/app.exception';
 import { UsersRepository, UserWithRoles } from '../users/users.repository';
 import { AuthRepository } from './auth.repository';
@@ -65,6 +66,7 @@ describe('AuthService', () => {
       repo as unknown as AuthRepository,
       tokens as unknown as TokenService,
       { getOrThrow: () => 'http://app' } as unknown as ConfigService,
+      { record: jest.fn() } as unknown as AuditService,
     );
   });
 

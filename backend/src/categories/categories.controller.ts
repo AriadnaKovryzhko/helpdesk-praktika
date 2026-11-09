@@ -36,20 +36,24 @@ export class CategoriesController {
 
   @Roles(RoleCode.MANAGER)
   @Post()
-  create(@Body() dto: CreateCategoryDto) {
-    return this.categories.create(dto);
+  create(@Body() dto: CreateCategoryDto, @CurrentUser() actor: AuthUser) {
+    return this.categories.create(dto, actor);
   }
 
   @Roles(RoleCode.MANAGER)
   @Patch(':id')
-  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateCategoryDto) {
-    return this.categories.update(id, dto);
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateCategoryDto,
+    @CurrentUser() actor: AuthUser,
+  ) {
+    return this.categories.update(id, dto, actor);
   }
 
   @Roles(RoleCode.MANAGER)
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.categories.remove(id);
+  remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() actor: AuthUser) {
+    return this.categories.remove(id, actor);
   }
 }

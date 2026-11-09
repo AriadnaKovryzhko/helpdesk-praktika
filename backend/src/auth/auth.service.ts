@@ -2,6 +2,8 @@ import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { RoleCode } from '@prisma/client';
 import * as argon2 from 'argon2';
+import { AuditAction } from '../audit/audit.actions';
+import { AuditService } from '../audit/audit.service';
 import { AppException } from '../common/errors/app.exception';
 import { toUserDto, UserDto } from '../users/user.presenter';
 import { UsersRepository } from '../users/users.repository';
@@ -40,6 +42,7 @@ export class AuthService {
     private readonly authRepository: AuthRepository,
     private readonly tokens: TokenService,
     private readonly config: ConfigService,
+    private readonly audit: AuditService,
   ) {}
 
   async register(dto: RegisterDto): Promise<Session> {
@@ -57,6 +60,12 @@ export class AuthService {
       passwordHash: await argon2.hash(dto.password),
       role: RoleCode.USER,
     });
+    await this.audit.record({
+      actorId: user.id,
+      action: AuditAction.USER_REGISTERED,
+      entityType: 'User',
+      entityId: user.id,
+    });
     return this.openSession(user.id, toUserDto(user));
   }
 
@@ -66,7 +75,16 @@ export class AuthService {
       user?.passwordHash ?? (await this.dummyHash),
       dto.password,
     );
-    if (!user || !passwordMatches) throw invalidCredentials();
+    if (!user || !passwordMatches) {
+      await this.audit.record({
+        actorId: user?.id ?? null,
+        action: AuditAction.LOGIN_FAILED,
+        entityType: 'User',
+        entityId: user?.id,
+        details: { email: normalizeEmail(dto.email) },
+      });
+      throw invalidCredentials();
+    }
     if (user.isBlocked) {
       throw new AppException(
         HttpStatus.FORBIDDEN,
@@ -74,6 +92,12 @@ export class AuthService {
         'Учётная запись заблокирована. Обратитесь к руководителю',
       );
     }
+    await this.audit.record({
+      actorId: user.id,
+      action: AuditAction.LOGIN_SUCCESS,
+      entityType: 'User',
+      entityId: user.id,
+    });
     return this.openSession(user.id, toUserDto(user));
   }
 
@@ -117,6 +141,12 @@ export class AuthService {
     if (!(await this.authRepository.consumeResetToken(token.id, token.userId, passwordHash))) {
       throw invalidResetToken();
     }
+    await this.audit.record({
+      actorId: token.userId,
+      action: AuditAction.PASSWORD_RESET,
+      entityType: 'User',
+      entityId: token.userId,
+    });
   }
 
   private async openSession(userId: string, user: UserDto): Promise<Session> {
