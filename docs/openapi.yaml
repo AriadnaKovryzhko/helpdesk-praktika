@@ -1,0 +1,1007 @@
+openapi: 3.0.3
+info:
+  title: Help Desk API
+  description: |
+    Сервис учёта заявок в техподдержку.
+    Успешный ответ имеет вид `{ "data": ..., "meta": ... }`, ошибка имеет вид `{ "error": { "code", "message", "details" } }`.
+    События WebSocket: подключение к `/socket.io` с `auth.token` (access-токен), сервер отправляет событие `notification`.
+  version: 1.0.0
+servers:
+  - url: /api
+tags:
+  - name: health
+  - name: auth
+  - name: users
+  - name: tickets
+  - name: comments
+  - name: attachments
+  - name: categories
+  - name: sla-policies
+  - name: notifications
+  - name: audit-logs
+  - name: dashboard
+security:
+  - bearer: []
+paths:
+  /health:
+    get:
+      tags: [health]
+      summary: Состояние сервиса и базы данных
+      security: []
+      responses:
+        '200':
+          description: Сервис работает
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      status: { type: string, example: ok }
+                      uptimeSeconds: { type: integer }
+                  meta: { nullable: true }
+        '500': { $ref: '#/components/responses/Error' }
+  /auth/register:
+    post:
+      tags: [auth]
+      summary: Регистрация пользователя
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/Session' }
+        '400': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Вход по email и паролю
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Session' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+  /auth/refresh:
+    post:
+      tags: [auth]
+      summary: Обновление access-токена с ротацией refresh-токена из cookie
+      security: []
+      responses:
+        '200': { $ref: '#/components/responses/Session' }
+        '401': { $ref: '#/components/responses/Error' }
+  /auth/logout:
+    post:
+      tags: [auth]
+      summary: Выход и отзыв refresh-токена
+      security: []
+      responses:
+        '204': { description: Сессия завершена }
+  /auth/forgot-password:
+    post:
+      tags: [auth]
+      summary: Запрос на восстановление пароля (ссылка выводится в лог сервера)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '202': { description: Запрос принят независимо от наличия email }
+        '400': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+  /auth/reset-password:
+    post:
+      tags: [auth]
+      summary: Установка нового пароля по токену
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token: { type: string }
+                password: { type: string, minLength: 8 }
+      responses:
+        '204': { description: Пароль изменён, все сессии завершены }
+        '400': { $ref: '#/components/responses/Error' }
+  /users:
+    get:
+      tags: [users]
+      summary: Список пользователей (MANAGER)
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PageSize' }
+        - { $ref: '#/components/parameters/Search' }
+        - { $ref: '#/components/parameters/SortOrder' }
+        - { name: sortBy, in: query, schema: { type: string, enum: [fullName, email, createdAt] } }
+        - { name: role, in: query, schema: { $ref: '#/components/schemas/Role' } }
+        - { name: isBlocked, in: query, schema: { type: boolean } }
+      responses:
+        '200':
+          description: Страница пользователей
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/User' } }
+                  meta: { $ref: '#/components/schemas/PageMeta' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+  /users/agents:
+    get:
+      tags: [users]
+      summary: Исполнители для назначения (AGENT, MANAGER)
+      responses:
+        '200':
+          description: Список исполнителей
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/UserBrief' } }
+                  meta: { nullable: true }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+  /users/me:
+    get:
+      tags: [users]
+      summary: Профиль текущего пользователя
+      responses:
+        '200': { $ref: '#/components/responses/UserResponse' }
+        '401': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [users]
+      summary: Изменение профиля
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fullName: { type: string, maxLength: 120 }
+                phone: { type: string, nullable: true }
+      responses:
+        '200': { $ref: '#/components/responses/UserResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+  /users/me/password:
+    post:
+      tags: [users]
+      summary: Смена пароля
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string }
+                newPassword: { type: string, minLength: 8 }
+      responses:
+        '204': { description: Пароль изменён }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+  /users/{id}:
+    get:
+      tags: [users]
+      summary: Карточка пользователя (MANAGER)
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { $ref: '#/components/responses/UserResponse' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /users/{id}/roles:
+    put:
+      tags: [users]
+      summary: Изменение ролей (MANAGER)
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [roles]
+              properties:
+                roles:
+                  type: array
+                  minItems: 1
+                  items: { $ref: '#/components/schemas/Role' }
+      responses:
+        '200': { $ref: '#/components/responses/UserResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /users/{id}/block:
+    post:
+      tags: [users]
+      summary: Блокировка пользователя и отзыв его токенов (MANAGER)
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { $ref: '#/components/responses/UserResponse' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /users/{id}/unblock:
+    post:
+      tags: [users]
+      summary: Разблокировка пользователя (MANAGER)
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { $ref: '#/components/responses/UserResponse' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /tickets:
+    get:
+      tags: [tickets]
+      summary: Список доступных заявок
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PageSize' }
+        - { $ref: '#/components/parameters/Search' }
+        - { $ref: '#/components/parameters/SortOrder' }
+        - name: sortBy
+          in: query
+          schema: { type: string, enum: [number, createdAt, updatedAt, priority, status, resolutionDueAt] }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/TicketStatus' } }
+        - { name: priority, in: query, schema: { $ref: '#/components/schemas/Priority' } }
+        - { name: categoryId, in: query, schema: { type: integer } }
+        - { name: assigneeId, in: query, schema: { type: string, format: uuid } }
+        - { name: overdue, in: query, schema: { type: boolean } }
+        - { name: assignedToMe, in: query, schema: { type: boolean } }
+        - { name: createdByMe, in: query, schema: { type: boolean } }
+      responses:
+        '200':
+          description: Страница заявок
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/Ticket' } }
+                  meta: { $ref: '#/components/schemas/PageMeta' }
+        '401': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [tickets]
+      summary: Создание заявки
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TicketInput' }
+      responses:
+        '201': { $ref: '#/components/responses/TicketResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+  /tickets/{id}:
+    get:
+      tags: [tickets]
+      summary: Карточка заявки с разрешёнными действиями
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { $ref: '#/components/responses/TicketResponse' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [tickets]
+      summary: Изменение заявки
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TicketInput' }
+      responses:
+        '200': { $ref: '#/components/responses/TicketResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [tickets]
+      summary: Удаление заявки
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '204': { description: Заявка удалена }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /tickets/{id}/status:
+    post:
+      tags: [tickets]
+      summary: Смена статуса по разрешённому переходу
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { $ref: '#/components/schemas/TicketStatus' }
+                comment: { type: string, maxLength: 500 }
+      responses:
+        '200': { $ref: '#/components/responses/TicketResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /tickets/{id}/assign:
+    post:
+      tags: [tickets]
+      summary: Назначение исполнителя (без assigneeId назначается текущий исполнитель)
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                assigneeId: { type: string, format: uuid }
+      responses:
+        '200': { $ref: '#/components/responses/TicketResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /tickets/{id}/history:
+    get:
+      tags: [tickets]
+      summary: История статусов заявки
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: История
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/StatusHistoryEntry' } }
+                  meta: { nullable: true }
+        '404': { $ref: '#/components/responses/Error' }
+  /tickets/{ticketId}/comments:
+    parameters: [{ $ref: '#/components/parameters/TicketId' }]
+    get:
+      tags: [comments]
+      summary: Комментарии заявки
+      responses:
+        '200':
+          description: Комментарии
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/Comment' } }
+                  meta: { nullable: true }
+        '404': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [comments]
+      summary: Добавление комментария
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CommentInput' }
+      responses:
+        '201': { $ref: '#/components/responses/CommentResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /tickets/{ticketId}/comments/{commentId}:
+    parameters:
+      - { $ref: '#/components/parameters/TicketId' }
+      - { name: commentId, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      tags: [comments]
+      summary: Изменение своего комментария
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CommentInput' }
+      responses:
+        '200': { $ref: '#/components/responses/CommentResponse' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [comments]
+      summary: Удаление комментария автором или руководителем
+      responses:
+        '204': { description: Комментарий удалён }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /tickets/{ticketId}/attachments:
+    parameters: [{ $ref: '#/components/parameters/TicketId' }]
+    get:
+      tags: [attachments]
+      summary: Вложения заявки
+      responses:
+        '200':
+          description: Вложения
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/Attachment' } }
+                  meta: { nullable: true }
+        '404': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [attachments]
+      summary: Загрузка вложения (jpg, png, pdf, docx, до 5 МБ, тип проверяется по содержимому)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '201':
+          description: Вложение загружено
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Attachment' }
+                  meta: { nullable: true }
+        '400': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '413': { $ref: '#/components/responses/Error' }
+  /tickets/{ticketId}/attachments/{attachmentId}/download:
+    parameters:
+      - { $ref: '#/components/parameters/TicketId' }
+      - { $ref: '#/components/parameters/AttachmentId' }
+    get:
+      tags: [attachments]
+      summary: Скачивание вложения с проверкой прав
+      responses:
+        '200':
+          description: Содержимое файла
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '404': { $ref: '#/components/responses/Error' }
+  /tickets/{ticketId}/attachments/{attachmentId}:
+    parameters:
+      - { $ref: '#/components/parameters/TicketId' }
+      - { $ref: '#/components/parameters/AttachmentId' }
+    delete:
+      tags: [attachments]
+      summary: Удаление вложения
+      responses:
+        '204': { description: Вложение удалено }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /categories:
+    get:
+      tags: [categories]
+      summary: Список категорий
+      parameters:
+        - { name: includeInactive, in: query, schema: { type: boolean } }
+      responses:
+        '200':
+          description: Категории
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/Category' } }
+                  meta: { nullable: true }
+    post:
+      tags: [categories]
+      summary: Создание категории (MANAGER)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CategoryInput' }
+      responses:
+        '201': { $ref: '#/components/responses/CategoryResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /categories/{id}:
+    parameters: [{ $ref: '#/components/parameters/IntId' }]
+    get:
+      tags: [categories]
+      summary: Категория
+      responses:
+        '200': { $ref: '#/components/responses/CategoryResponse' }
+        '404': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [categories]
+      summary: Изменение категории (MANAGER)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CategoryInput' }
+      responses:
+        '200': { $ref: '#/components/responses/CategoryResponse' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [categories]
+      summary: Удаление категории без заявок (MANAGER)
+      responses:
+        '204': { description: Категория удалена }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /sla-policies:
+    get:
+      tags: [sla-policies]
+      summary: Список SLA-политик
+      responses:
+        '200':
+          description: SLA-политики
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/SlaPolicy' } }
+                  meta: { nullable: true }
+    post:
+      tags: [sla-policies]
+      summary: Создание политики (MANAGER)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SlaPolicyInput' }
+      responses:
+        '201': { $ref: '#/components/responses/SlaPolicyResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /sla-policies/{id}:
+    parameters: [{ $ref: '#/components/parameters/IntId' }]
+    get:
+      tags: [sla-policies]
+      summary: SLA-политика
+      responses:
+        '200': { $ref: '#/components/responses/SlaPolicyResponse' }
+        '404': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [sla-policies]
+      summary: Изменение политики (MANAGER)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reactionMinutes: { type: integer, minimum: 1 }
+                resolutionMinutes: { type: integer, minimum: 1 }
+      responses:
+        '200': { $ref: '#/components/responses/SlaPolicyResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [sla-policies]
+      summary: Удаление неиспользуемой политики (MANAGER)
+      responses:
+        '204': { description: Политика удалена }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /notifications:
+    get:
+      tags: [notifications]
+      summary: Уведомления текущего пользователя
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PageSize' }
+        - { name: unreadOnly, in: query, schema: { type: boolean } }
+      responses:
+        '200':
+          description: Страница уведомлений
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/Notification' } }
+                  meta: { $ref: '#/components/schemas/PageMeta' }
+        '401': { $ref: '#/components/responses/Error' }
+  /notifications/unread-count:
+    get:
+      tags: [notifications]
+      summary: Количество непрочитанных уведомлений
+      responses:
+        '200':
+          description: Количество
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      count: { type: integer }
+                  meta: { nullable: true }
+  /notifications/read-all:
+    post:
+      tags: [notifications]
+      summary: Отметить все уведомления прочитанными
+      responses:
+        '204': { description: Готово }
+  /notifications/{id}/read:
+    post:
+      tags: [notifications]
+      summary: Отметить уведомление прочитанным
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '204': { description: Готово }
+        '404': { $ref: '#/components/responses/Error' }
+  /audit-logs:
+    get:
+      tags: [audit-logs]
+      summary: Журнал аудита (MANAGER)
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PageSize' }
+        - { $ref: '#/components/parameters/Search' }
+        - { $ref: '#/components/parameters/SortOrder' }
+        - { name: action, in: query, schema: { type: string } }
+        - { name: entityType, in: query, schema: { type: string } }
+        - { name: actorId, in: query, schema: { type: string, format: uuid } }
+        - { name: dateFrom, in: query, schema: { type: string, format: date-time } }
+        - { name: dateTo, in: query, schema: { type: string, format: date-time } }
+      responses:
+        '200':
+          description: Страница журнала
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/AuditLog' } }
+                  meta: { $ref: '#/components/schemas/PageMeta' }
+        '403': { $ref: '#/components/responses/Error' }
+  /dashboard:
+    get:
+      tags: [dashboard]
+      summary: Показатели для графиков (MANAGER)
+      responses:
+        '200':
+          description: Показатели
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Dashboard' }
+                  meta: { nullable: true }
+        '403': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    bearer: { type: http, scheme: bearer, bearerFormat: JWT }
+  parameters:
+    Id: { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    IntId: { name: id, in: path, required: true, schema: { type: integer } }
+    TicketId: { name: ticketId, in: path, required: true, schema: { type: string, format: uuid } }
+    AttachmentId: { name: attachmentId, in: path, required: true, schema: { type: string, format: uuid } }
+    Page: { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+    PageSize: { name: pageSize, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+    Search: { name: search, in: query, schema: { type: string } }
+    SortOrder: { name: sortOrder, in: query, schema: { type: string, enum: [asc, desc], default: desc } }
+  responses:
+    Error:
+      description: Ошибка
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorBody' }
+    Session:
+      description: Сессия. Refresh-токен передаётся в httpOnly cookie.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: object
+                properties:
+                  accessToken: { type: string }
+                  user: { $ref: '#/components/schemas/User' }
+              meta: { nullable: true }
+    UserResponse:
+      description: Пользователь
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data: { $ref: '#/components/schemas/User' }
+              meta: { nullable: true }
+    TicketResponse:
+      description: Заявка
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data: { $ref: '#/components/schemas/TicketDetails' }
+              meta: { nullable: true }
+    CommentResponse:
+      description: Комментарий
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data: { $ref: '#/components/schemas/Comment' }
+              meta: { nullable: true }
+    CategoryResponse:
+      description: Категория
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data: { $ref: '#/components/schemas/Category' }
+              meta: { nullable: true }
+    SlaPolicyResponse:
+      description: SLA-политика
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data: { $ref: '#/components/schemas/SlaPolicy' }
+              meta: { nullable: true }
+  schemas:
+    Role: { type: string, enum: [USER, AGENT, MANAGER] }
+    TicketStatus: { type: string, enum: [NEW, ASSIGNED, IN_PROGRESS, WAITING_USER, RESOLVED, CLOSED] }
+    Priority: { type: string, enum: [LOW, MEDIUM, HIGH, CRITICAL] }
+    ErrorBody:
+      type: object
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string, example: VALIDATION_ERROR }
+            message: { type: string, example: Проверьте правильность заполнения полей }
+            details: { nullable: true }
+    PageMeta:
+      type: object
+      properties:
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+        totalPages: { type: integer }
+    RegisterRequest:
+      type: object
+      required: [email, password, fullName]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+        fullName: { type: string, maxLength: 120 }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+    UserBrief:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        fullName: { type: string }
+        email: { type: string }
+    User:
+      allOf:
+        - { $ref: '#/components/schemas/UserBrief' }
+        - type: object
+          properties:
+            phone: { type: string, nullable: true }
+            roles: { type: array, items: { $ref: '#/components/schemas/Role' } }
+            isBlocked: { type: boolean }
+            createdAt: { type: string, format: date-time }
+    TicketInput:
+      type: object
+      required: [title, description, categoryId, priority]
+      properties:
+        title: { type: string, minLength: 5, maxLength: 200 }
+        description: { type: string, minLength: 10, maxLength: 5000 }
+        categoryId: { type: integer }
+        priority: { $ref: '#/components/schemas/Priority' }
+    Ticket:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        number: { type: integer }
+        title: { type: string }
+        description: { type: string }
+        status: { $ref: '#/components/schemas/TicketStatus' }
+        priority: { $ref: '#/components/schemas/Priority' }
+        category: { type: object, properties: { id: { type: integer }, name: { type: string } } }
+        author: { $ref: '#/components/schemas/UserBrief' }
+        assignee:
+          nullable: true
+          allOf: [{ $ref: '#/components/schemas/UserBrief' }]
+        reactionDueAt: { type: string, format: date-time }
+        resolutionDueAt: { type: string, format: date-time }
+        reactedAt: { type: string, format: date-time, nullable: true }
+        resolvedAt: { type: string, format: date-time, nullable: true }
+        closedAt: { type: string, format: date-time, nullable: true }
+        reactionBreachedAt: { type: string, format: date-time, nullable: true }
+        resolutionBreachedAt: { type: string, format: date-time, nullable: true }
+        isOverdue: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    TicketDetails:
+      allOf:
+        - { $ref: '#/components/schemas/Ticket' }
+        - type: object
+          properties:
+            allowedTransitions: { type: array, items: { $ref: '#/components/schemas/TicketStatus' } }
+            canEdit: { type: boolean }
+            canDelete: { type: boolean }
+            canTake: { type: boolean }
+            canAssign: { type: boolean }
+    StatusHistoryEntry:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        fromStatus:
+          nullable: true
+          allOf: [{ $ref: '#/components/schemas/TicketStatus' }]
+        toStatus: { $ref: '#/components/schemas/TicketStatus' }
+        comment: { type: string, nullable: true }
+        changedBy: { $ref: '#/components/schemas/UserBrief' }
+        createdAt: { type: string, format: date-time }
+    CommentInput:
+      type: object
+      required: [body]
+      properties:
+        body: { type: string, minLength: 1, maxLength: 5000 }
+    Comment:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        body: { type: string }
+        author: { $ref: '#/components/schemas/UserBrief' }
+        canEdit: { type: boolean }
+        canDelete: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    Attachment:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        originalName: { type: string }
+        mimeType: { type: string }
+        sizeBytes: { type: integer }
+        uploader: { $ref: '#/components/schemas/UserBrief' }
+        canDelete: { type: boolean }
+        createdAt: { type: string, format: date-time }
+    CategoryInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, maxLength: 80 }
+        description: { type: string, nullable: true, maxLength: 300 }
+        isActive: { type: boolean }
+    Category:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        isActive: { type: boolean }
+    SlaPolicyInput:
+      type: object
+      required: [priority, reactionMinutes, resolutionMinutes]
+      properties:
+        priority: { $ref: '#/components/schemas/Priority' }
+        reactionMinutes: { type: integer, minimum: 1 }
+        resolutionMinutes: { type: integer, minimum: 1 }
+    SlaPolicy:
+      allOf:
+        - { $ref: '#/components/schemas/SlaPolicyInput' }
+        - type: object
+          properties:
+            id: { type: integer }
+    Notification:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        type: { type: string, enum: [TICKET_CREATED, TICKET_ASSIGNED, STATUS_CHANGED, COMMENT_ADDED, SLA_BREACHED] }
+        title: { type: string }
+        body: { type: string }
+        ticketId: { type: string, format: uuid, nullable: true }
+        readAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+    AuditLog:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        action: { type: string, example: TICKET_STATUS_CHANGED }
+        entityType: { type: string, example: Ticket }
+        entityId: { type: string, nullable: true }
+        details: { type: object, nullable: true }
+        ip: { type: string, nullable: true }
+        actor:
+          nullable: true
+          allOf: [{ $ref: '#/components/schemas/UserBrief' }]
+        createdAt: { type: string, format: date-time }
+    Dashboard:
+      type: object
+      properties:
+        totals:
+          type: object
+          properties:
+            all: { type: integer }
+            open: { type: integer }
+            overdue: { type: integer }
+            createdToday: { type: integer }
+        byStatus:
+          type: array
+          items:
+            type: object
+            properties:
+              status: { $ref: '#/components/schemas/TicketStatus' }
+              count: { type: integer }
+        sla:
+          type: object
+          properties:
+            compliancePercent: { type: number }
+            byPriority:
+              type: array
+              items:
+                type: object
+                properties:
+                  priority: { $ref: '#/components/schemas/Priority' }
+                  breached: { type: integer }
+                  onTime: { type: integer }
+        agentLoad:
+          type: array
+          items:
+            type: object
+            properties:
+              agent: { $ref: '#/components/schemas/UserBrief' }
+              open: { type: integer }
+              overdue: { type: integer }
+              resolved: { type: integer }
+        createdByDay:
+          type: array
+          items:
+            type: object
+            properties:
+              date: { type: string, format: date }
+              count: { type: integer }
