@@ -1,9 +1,28 @@
 import { render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, vi } from 'vitest';
 import { App } from './App';
 
 describe('App', () => {
-  it('показывает название сервиса', () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ error: { code: 'INVALID_SESSION', message: 'нет' } }), {
+          status: 401,
+        }),
+      ),
+    );
+  });
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('показывает проверку входа, пока сессия неизвестна', () => {
     render(<App />);
-    expect(screen.getByRole('heading', { name: 'Help Desk' })).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Проверяем вход');
+  });
+
+  it('перенаправляет гостя на страницу входа', async () => {
+    render(<App />);
+    expect(await screen.findByRole('heading', { name: 'Вход' })).toBeInTheDocument();
   });
 });
