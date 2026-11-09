@@ -2,7 +2,7 @@ import type { ButtonHTMLAttributes } from 'react';
 import { cn } from '@/lib/cn';
 import { Spinner } from './Spinner';
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'inverse';
 
 const VARIANTS: Record<Variant, string> = {
   primary: 'bg-brand-600 text-white hover:bg-brand-700 focus-visible:outline-brand-600',
@@ -10,6 +10,7 @@ const VARIANTS: Record<Variant, string> = {
     'border border-ink-200 bg-white text-ink-800 hover:bg-ink-50 focus-visible:outline-brand-600',
   ghost: 'text-ink-700 hover:bg-ink-100 focus-visible:outline-brand-600',
   danger: 'bg-red-600 text-white hover:bg-red-700 focus-visible:outline-red-600',
+  inverse: 'text-ink-200 hover:bg-white/10 focus-visible:outline-white',
 };
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {

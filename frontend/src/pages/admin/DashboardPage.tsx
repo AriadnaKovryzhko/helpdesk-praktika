@@ -100,7 +100,7 @@ export function DashboardPage() {
               />
               <YAxis tick={AXIS} allowDecimals={false} />
               <Tooltip />
-              <Bar dataKey="count" name="Заявок" radius={[4, 4, 0, 0]}>
+              <Bar dataKey="count" name="Заявок" radius={[4, 4, 0, 0]} isAnimationActive={false}>
                 {statusData.map((row) => (
                   <Cell key={row.status} fill={STATUS_COLORS[row.status]} />
                 ))}
@@ -116,8 +116,20 @@ export function DashboardPage() {
               <YAxis tick={AXIS} allowDecimals={false} />
               <Tooltip />
               <Legend />
-              <Bar dataKey="onTime" name="В срок" stackId="sla" fill={ON_TIME} />
-              <Bar dataKey="breached" name="Просрочено" stackId="sla" fill={BREACHED} />
+              <Bar
+                dataKey="onTime"
+                name="В срок"
+                stackId="sla"
+                fill={ON_TIME}
+                isAnimationActive={false}
+              />
+              <Bar
+                dataKey="breached"
+                name="Просрочено"
+                stackId="sla"
+                fill={BREACHED}
+                isAnimationActive={false}
+              />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -129,9 +141,9 @@ export function DashboardPage() {
               <YAxis tick={AXIS} allowDecimals={false} />
               <Tooltip />
               <Legend />
-              <Bar dataKey="open" name="В работе" fill={NEUTRAL} />
-              <Bar dataKey="overdue" name="Просрочено" fill={BREACHED} />
-              <Bar dataKey="resolved" name="Решено" fill={ON_TIME} />
+              <Bar dataKey="open" name="В работе" fill={NEUTRAL} isAnimationActive={false} />
+              <Bar dataKey="overdue" name="Просрочено" fill={BREACHED} isAnimationActive={false} />
+              <Bar dataKey="resolved" name="Решено" fill={ON_TIME} isAnimationActive={false} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -148,6 +160,7 @@ export function DashboardPage() {
                 name="Заявок"
                 stroke={NEUTRAL}
                 strokeWidth={2}
+                isAnimationActive={false}
               />
             </LineChart>
           </ResponsiveContainer>

@@ -56,12 +56,7 @@ function UserFooter() {
       <p className="mb-3 text-xs text-ink-400">
         {user.roles.map((role) => ROLE_LABELS[role]).join(', ')}
       </p>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="w-full text-ink-200 hover:bg-white/10"
-        onClick={() => void logout()}
-      >
+      <Button variant="inverse" size="sm" className="w-full" onClick={() => void logout()}>
         Выйти
       </Button>
     </div>
