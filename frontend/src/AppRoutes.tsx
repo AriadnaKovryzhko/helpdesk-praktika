@@ -10,6 +10,10 @@ import { TicketsPage } from '@/pages/tickets/TicketsPage';
 import { NewTicketPage } from '@/pages/tickets/NewTicketPage';
 import { TicketDetailsPage } from '@/pages/tickets/TicketDetailsPage';
 import { ProfilePage } from '@/pages/ProfilePage';
+import { UsersPage } from '@/pages/admin/UsersPage';
+import { CategoriesPage } from '@/pages/admin/CategoriesPage';
+import { SlaPoliciesPage } from '@/pages/admin/SlaPoliciesPage';
+import { AuditPage } from '@/pages/admin/AuditPage';
 import { Placeholder } from '@/pages/Placeholder';
 
 export function AppRoutes() {
@@ -31,10 +35,10 @@ export function AppRoutes() {
           <Route path="/notifications" element={<Placeholder title="Уведомления" />} />
           <Route element={<RequireRole roles={['MANAGER']} />}>
             <Route path="/dashboard" element={<Placeholder title="Дашборд" />} />
-            <Route path="/admin/users" element={<Placeholder title="Пользователи" />} />
-            <Route path="/admin/categories" element={<Placeholder title="Категории" />} />
-            <Route path="/admin/sla" element={<Placeholder title="SLA-политики" />} />
-            <Route path="/admin/audit" element={<Placeholder title="Журнал аудита" />} />
+            <Route path="/admin/users" element={<UsersPage />} />
+            <Route path="/admin/categories" element={<CategoriesPage />} />
+            <Route path="/admin/sla" element={<SlaPoliciesPage />} />
+            <Route path="/admin/audit" element={<AuditPage />} />
           </Route>
           <Route path="*" element={<NotFoundPage />} />
         </Route>
