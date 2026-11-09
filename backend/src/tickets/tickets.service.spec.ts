@@ -259,6 +259,14 @@ describe('TicketsService', () => {
       );
     });
 
+    it('не назначает заявку на её автора', async () => {
+      repo.findById.mockResolvedValue(ticketRow({ authorId: 'agent' }));
+      expect((await failure(service.assign('t1', { assigneeId: 'agent' }, manager))).code).toBe(
+        'AUTHOR_CANNOT_PROCESS',
+      );
+      expect(repo.applyAssignment).not.toHaveBeenCalled();
+    });
+
     it('сообщает о гонке, если заявку взяли раньше', async () => {
       repo.findById.mockResolvedValue(ticketRow());
       repo.applyAssignment.mockResolvedValue(null);

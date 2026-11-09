@@ -171,6 +171,13 @@ export class TicketsService {
         'Заявка уже назначена на этого исполнителя',
       );
     }
+    if (assigneeId === ticket.authorId) {
+      throw new AppException(
+        HttpStatus.BAD_REQUEST,
+        'AUTHOR_CANNOT_PROCESS',
+        'Автор заявки не может её обрабатывать',
+      );
+    }
     await this.assertAssignableAgent(assigneeId);
     const updated = await this.tickets.applyAssignment({
       ticketId: id,

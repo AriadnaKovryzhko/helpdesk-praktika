@@ -1,7 +1,14 @@
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { randomUUID } from 'crypto';
 import request from 'supertest';
-import { createTestApp, createTicket, loginAs, prismaOf, registerUser } from './helpers';
+import {
+  createTestApp,
+  createTicket,
+  firstCategoryId,
+  loginAs,
+  prismaOf,
+  registerUser,
+} from './helpers';
 
 describe('API заявок', () => {
   let app: NestExpressApplication;
@@ -61,6 +68,22 @@ describe('API заявок', () => {
       'RESOLVED',
       'CLOSED',
     ]);
+  });
+
+  it('разрешает создавать заявки только пользователям', async () => {
+    for (const token of [agent, manager]) {
+      const response = await api()
+        .post('/api/tickets')
+        .set(auth(token))
+        .send({
+          title: 'Заявка сотрудника',
+          description: 'Сотрудник не должен создавать заявки',
+          categoryId: await firstCategoryId(app),
+          priority: 'LOW',
+        })
+        .expect(403);
+      expect(response.body.error.code).toBe('FORBIDDEN');
+    }
   });
 
   it('отклоняет запрещённый переход статуса кодом 409', async () => {

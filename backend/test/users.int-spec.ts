@@ -57,6 +57,16 @@ describe('API пользователей и панели руководител�
     await api().get('/api/users').set(auth(target.token)).expect(200);
   });
 
+  it('не совмещает роль пользователя с ролями сотрудников', async () => {
+    const target = await registerUser(app);
+    const response = await api()
+      .put(`/api/users/${target.id}/roles`)
+      .set(auth(manager))
+      .send({ roles: ['USER', 'AGENT'] })
+      .expect(400);
+    expect(response.body.error.code).toBe('INCOMPATIBLE_ROLES');
+  });
+
   it('фильтрует список пользователей на сервере', async () => {
     const response = await api()
       .get('/api/users')
