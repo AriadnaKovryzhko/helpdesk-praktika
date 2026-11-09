@@ -9,6 +9,7 @@ import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage';
 import { TicketsPage } from '@/pages/tickets/TicketsPage';
 import { NewTicketPage } from '@/pages/tickets/NewTicketPage';
 import { TicketDetailsPage } from '@/pages/tickets/TicketDetailsPage';
+import { ProfilePage } from '@/pages/ProfilePage';
 import { Placeholder } from '@/pages/Placeholder';
 
 export function AppRoutes() {
@@ -26,7 +27,7 @@ export function AppRoutes() {
           <Route path="/tickets" element={<TicketsPage />} />
           <Route path="/tickets/new" element={<NewTicketPage />} />
           <Route path="/tickets/:id" element={<TicketDetailsPage />} />
-          <Route path="/profile" element={<Placeholder title="Личный кабинет" />} />
+          <Route path="/profile" element={<ProfilePage />} />
           <Route path="/notifications" element={<Placeholder title="Уведомления" />} />
           <Route element={<RequireRole roles={['MANAGER']} />}>
             <Route path="/dashboard" element={<Placeholder title="Дашборд" />} />
