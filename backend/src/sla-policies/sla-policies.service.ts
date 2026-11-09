@@ -1,5 +1,8 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { SlaPolicy } from '@prisma/client';
+import { AuditAction } from '../audit/audit.actions';
+import { AuditService } from '../audit/audit.service';
+import { AuthUser } from '../common/auth/auth-user';
 import { AppException } from '../common/errors/app.exception';
 import { CreateSlaPolicyDto, UpdateSlaPolicyDto } from './dto/sla-policy.dto';
 import { SlaPoliciesRepository } from './sla-policies.repository';
@@ -9,7 +12,10 @@ const notFound = () =>
 
 @Injectable()
 export class SlaPoliciesService {
-  constructor(private readonly policies: SlaPoliciesRepository) {}
+  constructor(
+    private readonly policies: SlaPoliciesRepository,
+    private readonly audit: AuditService,
+  ) {}
 
   list(): Promise<SlaPolicy[]> {
     return this.policies.findAll();
@@ -21,7 +27,7 @@ export class SlaPoliciesService {
     return policy;
   }
 
-  async create(dto: CreateSlaPolicyDto): Promise<SlaPolicy> {
+  async create(dto: CreateSlaPolicyDto, actor: AuthUser): Promise<SlaPolicy> {
     this.assertOrder(dto.reactionMinutes, dto.resolutionMinutes);
     if (await this.policies.findByPriority(dto.priority)) {
       throw new AppException(
@@ -30,19 +36,35 @@ export class SlaPoliciesService {
         'Для этого приоритета политика уже существует',
       );
     }
-    return this.policies.create(dto);
+    const policy = await this.policies.create(dto);
+    await this.audit.record({
+      actorId: actor.id,
+      action: AuditAction.SLA_POLICY_CREATED,
+      entityType: 'SlaPolicy',
+      entityId: policy.id,
+      details: { ...dto },
+    });
+    return policy;
   }
 
-  async update(id: number, dto: UpdateSlaPolicyDto): Promise<SlaPolicy> {
+  async update(id: number, dto: UpdateSlaPolicyDto, actor: AuthUser): Promise<SlaPolicy> {
     const policy = await this.get(id);
     this.assertOrder(
       dto.reactionMinutes ?? policy.reactionMinutes,
       dto.resolutionMinutes ?? policy.resolutionMinutes,
     );
-    return this.policies.update(id, dto);
+    const updated = await this.policies.update(id, dto);
+    await this.audit.record({
+      actorId: actor.id,
+      action: AuditAction.SLA_POLICY_UPDATED,
+      entityType: 'SlaPolicy',
+      entityId: id,
+      details: { ...dto },
+    });
+    return updated;
   }
 
-  async remove(id: number): Promise<void> {
+  async remove(id: number, actor: AuthUser): Promise<void> {
     const policy = await this.get(id);
     if ((await this.policies.countTickets(policy.priority)) > 0) {
       throw new AppException(
@@ -52,6 +74,13 @@ export class SlaPoliciesService {
       );
     }
     await this.policies.delete(id);
+    await this.audit.record({
+      actorId: actor.id,
+      action: AuditAction.SLA_POLICY_DELETED,
+      entityType: 'SlaPolicy',
+      entityId: id,
+      details: { priority: policy.priority },
+    });
   }
 
   private assertOrder(reactionMinutes: number, resolutionMinutes: number): void {

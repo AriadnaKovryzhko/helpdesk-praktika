@@ -12,7 +12,8 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { RoleCode } from '@prisma/client';
-import { Roles } from '../common/auth/decorators';
+import { AuthUser } from '../common/auth/auth-user';
+import { CurrentUser, Roles } from '../common/auth/decorators';
 import { CreateSlaPolicyDto, UpdateSlaPolicyDto } from './dto/sla-policy.dto';
 import { SlaPoliciesService } from './sla-policies.service';
 
@@ -34,20 +35,24 @@ export class SlaPoliciesController {
 
   @Roles(RoleCode.MANAGER)
   @Post()
-  create(@Body() dto: CreateSlaPolicyDto) {
-    return this.policies.create(dto);
+  create(@Body() dto: CreateSlaPolicyDto, @CurrentUser() actor: AuthUser) {
+    return this.policies.create(dto, actor);
   }
 
   @Roles(RoleCode.MANAGER)
   @Patch(':id')
-  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateSlaPolicyDto) {
-    return this.policies.update(id, dto);
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateSlaPolicyDto,
+    @CurrentUser() actor: AuthUser,
+  ) {
+    return this.policies.update(id, dto, actor);
   }
 
   @Roles(RoleCode.MANAGER)
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.policies.remove(id);
+  remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() actor: AuthUser) {
+    return this.policies.remove(id, actor);
   }
 }

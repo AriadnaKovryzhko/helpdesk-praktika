@@ -2,12 +2,14 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AttachmentsModule } from './attachments/attachments.module';
+import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { CategoriesModule } from './categories/categories.module';
 import { CommentsModule } from './comments/comments.module';
 import { validateEnv } from './config/env.validation';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { HealthController } from './health/health.controller';
+import { NotificationsModule } from './notifications/notifications.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { SlaPoliciesModule } from './sla-policies/sla-policies.module';
 import { TicketsModule } from './tickets/tickets.module';
@@ -19,6 +21,8 @@ import { UsersModule } from './users/users.module';
     ScheduleModule.forRoot(),
     PrismaModule,
     AuthModule,
+    AuditModule,
+    NotificationsModule,
     CategoriesModule,
     SlaPoliciesModule,
     TicketsModule,

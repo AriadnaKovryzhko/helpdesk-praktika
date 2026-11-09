@@ -78,7 +78,7 @@ export class UsersController {
   @Roles(RoleCode.MANAGER)
   @Post(':id/unblock')
   @HttpCode(HttpStatus.OK)
-  unblock(@Param('id', ParseUUIDPipe) id: string) {
-    return this.users.unblock(id);
+  unblock(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() actor: AuthUser) {
+    return this.users.unblock(id, actor);
   }
 }

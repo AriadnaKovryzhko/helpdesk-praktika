@@ -1,11 +1,14 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { Prisma, RoleCode } from '@prisma/client';
 import * as argon2 from 'argon2';
+import { AuditAction } from '../audit/audit.actions';
+import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/auth/auth-user';
 import { PageResult } from '../common/dto/page-result';
 import { AppException } from '../common/errors/app.exception';
+import { NotificationsService } from '../notifications/notifications.service';
 import { ChangePasswordDto, UpdateProfileDto, UpdateRolesDto, UsersQueryDto } from './dto/user.dto';
-import { toUserDto, UserDto } from './user.presenter';
+import { roleCodes, toUserDto, UserDto } from './user.presenter';
 import { UsersRepository, UserWithRoles } from './users.repository';
 
 const notFound = () =>
@@ -13,7 +16,11 @@ const notFound = () =>
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly users: UsersRepository) {}
+  constructor(
+    private readonly users: UsersRepository,
+    private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   async list(query: UsersQueryDto): Promise<PageResult<UserDto>> {
     const [rows, total] = await this.users.findPage(
@@ -48,10 +55,16 @@ export class UsersService {
       );
     }
     await this.users.updatePassword(user.id, await argon2.hash(dto.newPassword));
+    await this.audit.record({
+      actorId: user.id,
+      action: AuditAction.PASSWORD_CHANGED,
+      entityType: 'User',
+      entityId: user.id,
+    });
   }
 
   async updateRoles(id: string, dto: UpdateRolesDto, actor: AuthUser): Promise<UserDto> {
-    await this.require(id);
+    const before = await this.require(id);
     if (id === actor.id && !dto.roles.includes(RoleCode.MANAGER)) {
       throw new AppException(
         HttpStatus.CONFLICT,
@@ -59,7 +72,15 @@ export class UsersService {
         'Нельзя снять роль руководителя с самого себя',
       );
     }
-    return toUserDto(await this.users.replaceRoles(id, dto.roles));
+    const updated = await this.users.replaceRoles(id, dto.roles);
+    await this.audit.record({
+      actorId: actor.id,
+      action: AuditAction.USER_ROLES_CHANGED,
+      entityType: 'User',
+      entityId: id,
+      details: { from: roleCodes(before), to: dto.roles },
+    });
+    return toUserDto(updated);
   }
 
   async block(id: string, actor: AuthUser): Promise<UserDto> {
@@ -67,12 +88,27 @@ export class UsersService {
       throw new AppException(HttpStatus.CONFLICT, 'CANNOT_BLOCK_SELF', 'Нельзя заблокировать себя');
     }
     await this.require(id);
-    return toUserDto(await this.users.setBlocked(id, true));
+    const updated = await this.users.setBlocked(id, true);
+    this.notifications.disconnectUser(id);
+    await this.audit.record({
+      actorId: actor.id,
+      action: AuditAction.USER_BLOCKED,
+      entityType: 'User',
+      entityId: id,
+    });
+    return toUserDto(updated);
   }
 
-  async unblock(id: string): Promise<UserDto> {
+  async unblock(id: string, actor: AuthUser): Promise<UserDto> {
     await this.require(id);
-    return toUserDto(await this.users.setBlocked(id, false));
+    const updated = await this.users.setBlocked(id, false);
+    await this.audit.record({
+      actorId: actor.id,
+      action: AuditAction.USER_UNBLOCKED,
+      entityType: 'User',
+      entityId: id,
+    });
+    return toUserDto(updated);
   }
 
   private async require(id: string): Promise<UserWithRoles> {

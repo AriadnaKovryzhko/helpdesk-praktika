@@ -1,9 +1,12 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { Prisma, RoleCode, TicketStatus } from '@prisma/client';
+import { NotificationType, Prisma, RoleCode, TicketStatus } from '@prisma/client';
+import { AuditAction, AuditActionCode } from '../audit/audit.actions';
+import { AuditService } from '../audit/audit.service';
 import { AuthUser, hasRole } from '../common/auth/auth-user';
 import { PageResult } from '../common/dto/page-result';
 import { AppException } from '../common/errors/app.exception';
 import { CategoriesRepository } from '../categories/categories.repository';
+import { NotificationsService } from '../notifications/notifications.service';
 import { UsersRepository } from '../users/users.repository';
 import { roleCodes } from '../users/user.presenter';
 import {
@@ -37,6 +40,8 @@ export class TicketsService {
     private readonly sla: SlaService,
     private readonly categories: CategoriesRepository,
     private readonly users: UsersRepository,
+    private readonly notifications: NotificationsService,
+    private readonly audit: AuditService,
   ) {}
 
   async list(query: TicketsQueryDto, user: AuthUser): Promise<PageResult<TicketDto>> {
@@ -60,6 +65,17 @@ export class TicketsService {
     await this.assertActiveCategory(dto.categoryId);
     const deadlines = await this.sla.calculateDeadlines(dto.priority, new Date());
     const ticket = await this.tickets.create({ ...dto, ...deadlines, authorId: user.id });
+    await this.recordTicket(user, AuditAction.TICKET_CREATED, ticket, {
+      priority: ticket.priority,
+    });
+    await this.notifications.notify({
+      userIds: await this.notifications.usersWithRoles(RoleCode.AGENT, RoleCode.MANAGER),
+      ticketId: ticket.id,
+      type: NotificationType.TICKET_CREATED,
+      title: `Новая заявка №${ticket.number}`,
+      body: ticket.title,
+      excludeUserId: user.id,
+    });
     return toTicketDto(ticket);
   }
 
@@ -83,13 +99,18 @@ export class TicketsService {
       dto.priority && dto.priority !== ticket.priority
         ? await this.recalculateDeadlines(ticket, dto.priority)
         : {};
-    return this.present(await this.tickets.update(id, { ...dto, ...deadlines }), user);
+    const updated = await this.tickets.update(id, { ...dto, ...deadlines });
+    await this.recordTicket(user, AuditAction.TICKET_UPDATED, updated, {
+      fields: Object.keys(dto),
+    });
+    return this.present(updated, user);
   }
 
   async remove(id: string, user: AuthUser): Promise<void> {
     const ticket = await this.getAccessible(id, user);
     if (!this.policy.canDelete(ticket, user)) throw forbidden('Эту заявку нельзя удалить');
     await this.tickets.delete(id);
+    await this.recordTicket(user, AuditAction.TICKET_DELETED, ticket, { title: ticket.title });
   }
 
   async changeStatus(id: string, dto: ChangeStatusDto, user: AuthUser) {
@@ -120,6 +141,18 @@ export class TicketsService {
       data: this.statusTimestamps(ticket.status, dto.status),
     });
     if (!updated) throw staleTicket();
+    await this.recordTicket(user, AuditAction.TICKET_STATUS_CHANGED, updated, {
+      from: ticket.status,
+      to: dto.status,
+    });
+    await this.notifications.notify({
+      userIds: [updated.authorId, ...(updated.assigneeId ? [updated.assigneeId] : [])],
+      ticketId: id,
+      type: NotificationType.STATUS_CHANGED,
+      title: `Заявка №${updated.number}: статус изменён`,
+      body: `Новый статус: ${STATUS_LABELS[dto.status]}`,
+      excludeUserId: user.id,
+    });
     return this.present(updated, user);
   }
 
@@ -148,6 +181,26 @@ export class TicketsService {
       reactedAt: new Date(),
     });
     if (!updated) throw staleTicket();
+    await this.recordTicket(user, AuditAction.TICKET_ASSIGNED, updated, {
+      from: ticket.assigneeId,
+      to: assigneeId,
+    });
+    await this.notifications.notify({
+      userIds: [assigneeId],
+      ticketId: id,
+      type: NotificationType.TICKET_ASSIGNED,
+      title: `Вам назначена заявка №${updated.number}`,
+      body: updated.title,
+      excludeUserId: user.id,
+    });
+    await this.notifications.notify({
+      userIds: [updated.authorId],
+      ticketId: id,
+      type: NotificationType.STATUS_CHANGED,
+      title: `Заявка №${updated.number}: назначен исполнитель`,
+      body: updated.assignee?.fullName ?? '',
+      excludeUserId: user.id,
+    });
     return this.present(updated, user);
   }
 
@@ -165,6 +218,21 @@ export class TicketsService {
       canTake: this.policy.canTake(ticket, user),
       canAssign: this.policy.canAssign(ticket, user),
     };
+  }
+
+  private recordTicket(
+    user: AuthUser,
+    action: AuditActionCode,
+    ticket: TicketWithRelations,
+    details: Prisma.InputJsonObject,
+  ): Promise<void> {
+    return this.audit.record({
+      actorId: user.id,
+      action,
+      entityType: 'Ticket',
+      entityId: ticket.id,
+      details: { number: ticket.number, ...details },
+    });
   }
 
   private assertCanTake(ticket: TicketWithRelations, user: AuthUser): void {
