@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { GuestOnly, RequireAuth, RequireRole } from '@/auth/guards';
 import { AppShell } from '@/layout/AppShell';
@@ -15,6 +16,11 @@ import { CategoriesPage } from '@/pages/admin/CategoriesPage';
 import { SlaPoliciesPage } from '@/pages/admin/SlaPoliciesPage';
 import { AuditPage } from '@/pages/admin/AuditPage';
 import { Placeholder } from '@/pages/Placeholder';
+import { LoadingState } from '@/ui';
+
+const DashboardPage = lazy(() =>
+  import('@/pages/admin/DashboardPage').then((module) => ({ default: module.DashboardPage })),
+);
 
 export function AppRoutes() {
   return (
@@ -34,7 +40,14 @@ export function AppRoutes() {
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/notifications" element={<Placeholder title="Уведомления" />} />
           <Route element={<RequireRole roles={['MANAGER']} />}>
-            <Route path="/dashboard" element={<Placeholder title="Дашборд" />} />
+            <Route
+              path="/dashboard"
+              element={
+                <Suspense fallback={<LoadingState />}>
+                  <DashboardPage />
+                </Suspense>
+              }
+            />
             <Route path="/admin/users" element={<UsersPage />} />
             <Route path="/admin/categories" element={<CategoriesPage />} />
             <Route path="/admin/sla" element={<SlaPoliciesPage />} />
