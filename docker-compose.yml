@@ -21,6 +21,12 @@ services:
       PORT: 3000
       SEED_ON_START: ${SEED_ON_START:-true}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
+      APP_URL: ${APP_URL:-http://localhost:8080}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-local-dev-only-change-me-to-a-long-random-string}
+      JWT_ACCESS_TTL_SECONDS: ${JWT_ACCESS_TTL_SECONDS:-900}
+      REFRESH_TTL_DAYS: ${REFRESH_TTL_DAYS:-30}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      AUTH_THROTTLE_LIMIT: ${AUTH_THROTTLE_LIMIT:-20}
       DATABASE_URL: postgresql://${POSTGRES_USER:-helpdesk}:${POSTGRES_PASSWORD:-helpdesk_local}@db:5432/${POSTGRES_DB:-helpdesk}
     depends_on:
       db:
