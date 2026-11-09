@@ -60,6 +60,7 @@ docker compose up --build
 cd backend
 cp .env.example .env
 npm ci
+npx prisma generate
 npx prisma migrate deploy
 npx prisma db seed
 npm run start:dev
