@@ -67,7 +67,10 @@ export class TokenService {
     return toAuthUser(user);
   }
 
-  async issueRefreshToken(userId: string, familyId: string = randomUUID()): Promise<RotatedRefreshToken> {
+  async issueRefreshToken(
+    userId: string,
+    familyId: string = randomUUID(),
+  ): Promise<RotatedRefreshToken> {
     const rawToken = randomToken();
     const expiresAt = new Date(Date.now() + this.refreshTtlDays() * DAY_MS);
     await this.authRepository.createRefreshToken({
