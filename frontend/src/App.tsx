@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { ApiError } from '@/api/client';
 import { AppRoutes } from '@/AppRoutes';
 import { AuthProvider } from '@/auth/AuthContext';
+import { NotificationsProvider } from '@/realtime/NotificationsProvider';
 import { ToastProvider } from '@/ui';
 
 function createQueryClient() {
@@ -27,7 +28,9 @@ export function App() {
       <BrowserRouter>
         <ToastProvider>
           <AuthProvider>
-            <AppRoutes />
+            <NotificationsProvider>
+              <AppRoutes />
+            </NotificationsProvider>
           </AuthProvider>
         </ToastProvider>
       </BrowserRouter>

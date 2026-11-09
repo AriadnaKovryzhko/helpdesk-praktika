@@ -4,6 +4,7 @@ import type { Role } from '@/api/types';
 import { useAuth } from '@/auth/AuthContext';
 import { cn } from '@/lib/cn';
 import { ROLE_LABELS } from '@/lib/labels';
+import { NotificationBell } from '@/realtime/NotificationBell';
 import { Button } from '@/ui';
 
 interface NavItem {
@@ -117,6 +118,7 @@ export function AppShell() {
           >
             Меню
           </button>
+          <NotificationBell />
         </header>
         <main className="mx-auto w-full max-w-[1400px] flex-1 p-4 sm:p-6">
           <Outlet />
