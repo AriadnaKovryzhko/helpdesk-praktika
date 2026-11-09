@@ -62,7 +62,7 @@ jobs:
             frontend/package-lock.json
       - run: npm ci
         working-directory: backend
-      - run: npx prisma generate && npx prisma migrate deploy
+      - run: npx prisma generate && npx prisma migrate deploy && npx prisma db seed
         working-directory: backend
       - run: npm run test:cov
         working-directory: backend
